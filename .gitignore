@@ -192,3 +192,7 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# Testing data
+eye_tracking_pipeline/tests/testing_data/
+eye_tracking_pipeline/tests/results/
