@@ -57,7 +57,7 @@ def run_pipeline(input_dir: str, output_dir: str, suppress_warnings: bool = Fals
                     output_file_name = f"{subject_code}_{{}}_{country_short_name}_{institution_short_name}_{exp_version}.csv" # Later inserted with Run
                     meta_dict[subject_code].append({
                         "out": output_file_name, 
-                        "Subject": subject_code,
+                        "Subject": int(subject_code),
                         "Country": country_metatable_code,
                         "Institution": institution_metatable_code,
                         "Version": exp_version,
@@ -73,6 +73,9 @@ def run_pipeline(input_dir: str, output_dir: str, suppress_warnings: bool = Fals
                         "numberOfTrials": None, # Updated later
                         "Session": None,        # Updated later     
                         "institutionCode": institution_code,
+                        "path": os.path.join(country_folder_name,
+                                               institution_folder_name,
+                                               exp_version)
                     })
                 
                 # Subjects with multiple attempts
