@@ -1,8 +1,9 @@
+import os
 import h5py
 import pandas as pd
 import numpy as np
 
-tobii_cols_to_remove =['left_gaze_z','left_angle_x','left_angle_y', 'left_raw_x', 'left_raw_y',\
+cols_to_remove =['left_gaze_z','left_angle_x','left_angle_y', 'left_raw_x', 'left_raw_y',\
     'left_pupil_measure1_type','left_pupil_measure2','left_pupil_measure2_type',\
     'left_ppd_x', 'left_ppd_y','left_velocity_x', 'left_velocity_y', 'left_velocity_xy',\
     'right_gaze_z','right_angle_x','right_angle_y', 'right_raw_x', 'right_raw_y',\
@@ -44,31 +45,8 @@ def clean_pupil(row):
     else:
         return np.nan  # both missing or invalid
 
-def tobii_hdf5_to_pandas(data_file_path: str) -> dict:
-    """
-    Reads a Tobii eye-tracking HDF5 file and converts relevant data into a pandas DataFrame.
-
-    Parameters:
-    ----------
-    data_file_path : str
-        The full file path to the HDF5 data file exported from a Tobii eye-tracker.
-
-    Returns:
-    -------
-    dict
-        A dictionary containing the results of the conversion with the following keys:
-            - "conversionSuccess": int
-                1 if the conversion was successful, 0 otherwise.
-            - "errorMessage": str or None
-                A message describing the error if one occurred, or None on success.
-            - "df": pandas.DataFrame or None
-                The DataFrame containing the trial-level data if successful, else None.
-    
-    Notes:
-    ------
-    Any exceptions during the file reading or conversion process are caught,
-    and a failure result is returned with an appropriate error message.
-    """
+def tobii_hdf5_to_pandas(input_dir: str, file_meta_row: pd.Series, output_dir: str) -> dict:
+    data_file_path = os.path.join(input_dir, file_meta_row['path'], file_meta_row['in'])
     with h5py.File(data_file_path, 'r') as hdf: 
         try:
             # Handle meta data
@@ -109,7 +87,7 @@ def tobii_hdf5_to_pandas(data_file_path: str) -> dict:
             eye_tracking_data = hdf['/data_collection/events/eyetracker/BinocularEyeSampleEvent']
             eye_tracking_df=pd.DataFrame(np.array(eye_tracking_data))
             
-            eye_tracking_df=eye_tracking_df.drop(tobii_cols_to_remove,axis=1)
+            eye_tracking_df=eye_tracking_df.drop(cols_to_remove,axis=1)
             eye_tracking_df=eye_tracking_df.loc[eye_tracking_df['time'].between(start_time,end_time)]
 
             if eye_tracking_df.empty:
@@ -167,43 +145,21 @@ def tobii_hdf5_to_pandas(data_file_path: str) -> dict:
             trial_df=trial_df.drop(['experiment_id','session_id','device_id','event_id','type'],axis=1)
             trial_df['TimeFromTrialOnset']=trial_df.time-trial_df.start_time
 
-
-            trial_df['image']=trial_df['image'].fillna(value='')
-
-            trial_df['semantic_image']=np.where(trial_df['AOI'] == 'semantic_image', True, False)
-            trial_df['target_image']=np.where(trial_df['AOI'] == 'target_image', True, False)
-            trial_df['unrelated_image']=np.where(trial_df['AOI'] == 'unrelated_image', True, False)
-            trial_df['phonological_image']=np.where(trial_df['AOI'] == 'phonological_image', True, False)
-
-            trial_df['semantic_image'] = trial_df['semantic_image'].astype('object')
-            trial_df['target_image'] = trial_df['target_image'].astype('object')
-            trial_df['unrelated_image'] = trial_df['unrelated_image'].astype('object')
-            trial_df['phonological_image'] = trial_df['phonological_image'].astype('object')
-            
-            trial_df.loc[trial_df.AOI=="","semantic_image"]=None
-            trial_df.loc[trial_df.AOI=="","target_image"]=None
-            trial_df.loc[trial_df.AOI=="","unrelated_image"]=None
-            trial_df.loc[trial_df.AOI=="","phonological_image"]=None
+            trial_df['image'] = trial_df['image'].fillna(value='')
             trial_df['trackloss']=False
             trial_df.loc[trial_df.gaze_y.isna()==True,'trackloss']=True
 
-            if 'Adult' in data_file_path:
-                school,speech,edit,group2,fname=data_file_path.split('\\')[-5:]
-                trial_df['school']=school
-                trial_df['speech']=speech
-                trial_df['edit']=edit
-                trial_df['group2']=group2
-                trial_df['fname']=fname
-            else:
-                land,school,group2,fname=data_file_path.split('\\')[-4:]
-                trial_df['land']=land
-                trial_df['school']=school
-                trial_df['group2']=group2
-                trial_df['fname']=fname
+            trial_df.to_csv(os.path.join(output_dir, file_meta_row['out']), index=False)
+
+            return os.path.join(output_dir, file_meta_row['out'])
+
             return {
                 "conversionSuccess": 1,
                 "errorMessage": None,
-                "df": trial_df
+                # "missingCount": missing_count,
+                # "missingPercent": missing_percent,
+                # "numberOfTrials": number_of_trials,
+                # "Session": session_info
             }
         
         except Exception as e:
@@ -211,7 +167,10 @@ def tobii_hdf5_to_pandas(data_file_path: str) -> dict:
             return {
                 "conversionSuccess": 0,
                 "errorMessage": f"Error: {str(e)}",
-                "df": None
+                "missingCount": None,
+                "missingPercent": None,
+                "numberOfTrials": None,
+                "Session": None
             }
             
 if __name__ == "__main__":

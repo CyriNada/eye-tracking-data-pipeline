@@ -1,7 +1,0 @@
-country_folders     = ['1.Austria', '2.Germany', '3.Switzerland']
-country_codes       = ['AT', 'DE', 'CH']
-country_metatable_codes = ['Österreich', 'Deutschland', 'Schweiz']
-institution_folders = ['Primary_school', 'Kindergarten']
-institution_codes   = ['GS', 'KG']
-institution_metatable_codes = ['Grundschule', 'KiGa']
-exp_versions        = ['A', 'B']
