@@ -102,7 +102,8 @@ def generate_metatable(input_dir: str) -> pd.DataFrame:
             "Session": None,        # Updated later     
             "institutionCode": institution_code,
             "path": relative_path,
-            "ifControlGroup": if_control_group
+            "ifControlGroup": if_control_group,
+            'conversionError': None # Updated later 
         })
         
     # Handle subjects with multiple attempts

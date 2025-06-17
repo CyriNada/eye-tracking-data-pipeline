@@ -1,4 +1,6 @@
 import os
+from typing import Tuple, List
+
 import h5py
 import pandas as pd
 import numpy as np
@@ -45,8 +47,10 @@ def clean_pupil(row):
     else:
         return np.nan  # both missing or invalid
 
-def tobii_hdf5_to_pandas(input_dir: str, file_meta_row: pd.Series, output_dir: str) -> dict:
-    data_file_path = os.path.join(input_dir, file_meta_row['path'], file_meta_row['in'])
+
+
+def eye_tracking_hdf5_to_df(data_file_path: str) -> dict:
+    file_name = data_file_path.split('\\')[-1]
     with h5py.File(data_file_path, 'r') as hdf: 
         try:
             # Handle meta data
@@ -58,13 +62,13 @@ def tobii_hdf5_to_pandas(input_dir: str, file_meta_row: pd.Series, output_dir: s
             trial_meta_df = trial_meta_df.dropna()
 
             if trial_meta_df.empty:
-                raise ValueError(f"Meta file is empty: {trial_file_csv}")
+                raise ValueError(f"Meta file is empty: {file_name}")
             
             # Handle MessageEvent
             events_data = hdf['/data_collection/events/experiment/MessageEvent']
             events_df=pd.DataFrame(np.array(events_data))
             if events_df.empty:
-                raise ValueError(f"MessageEvent is empty: {data_file_path}")
+                raise ValueError(f"MessageEvent is empty: {file_name}")
 
             events_df.text=events_df.text.str.decode('utf-8')
             
@@ -72,8 +76,6 @@ def tobii_hdf5_to_pandas(input_dir: str, file_meta_row: pd.Series, output_dir: s
             if events_df.loc[events_df.text=='trackerTest2022_2_5'].shape[0]!=1:
                 #print(events_df.loc[events_df.text=='trackerTest2022_2_5'])
                 raise ValueError(events_df.loc[events_df.text=='trackerTest2022_2_5'])
-            
-            #print(trial_file)
             
             events_df=events_df.drop(['device_time','logged_time','confidence_interval','delay','msg_offset','category'],axis=1)
 
@@ -91,9 +93,10 @@ def tobii_hdf5_to_pandas(input_dir: str, file_meta_row: pd.Series, output_dir: s
             eye_tracking_df=eye_tracking_df.loc[eye_tracking_df['time'].between(start_time,end_time)]
 
             if eye_tracking_df.empty:
-                raise ValueError(f"BinocularEyeSampleEvent is empty: {data_file_path}")
+                raise ValueError(f"BinocularEyeSampleEvent is empty: {file_name}")
             
-            eye_tracking_df=eye_tracking_df.loc[eye_tracking_df.status==0]
+            
+            # eye_tracking_df=eye_tracking_df.loc[eye_tracking_df.status==0] # Drops trackless data 
             eye_tracking_df['gaze_x']=eye_tracking_df[['left_gaze_x','right_gaze_x']].mean(axis=1)
             eye_tracking_df['gaze_y']=eye_tracking_df[['left_gaze_y','right_gaze_y']].mean(axis=1)
 
@@ -149,32 +152,77 @@ def tobii_hdf5_to_pandas(input_dir: str, file_meta_row: pd.Series, output_dir: s
             trial_df['trackloss']=False
             trial_df.loc[trial_df.gaze_y.isna()==True,'trackloss']=True
 
-            trial_df.to_csv(os.path.join(output_dir, file_meta_row['out']), index=False)
-
-            return os.path.join(output_dir, file_meta_row['out'])
-
             return {
                 "conversionSuccess": 1,
+                "session": recorded_session,
                 "errorMessage": None,
-                # "missingCount": missing_count,
-                # "missingPercent": missing_percent,
-                # "numberOfTrials": number_of_trials,
-                # "Session": session_info
+                "df": trial_df
             }
         
         except Exception as e:
             # raise e
             return {
                 "conversionSuccess": 0,
+                "session": None,
                 "errorMessage": f"Error: {str(e)}",
-                "missingCount": None,
-                "missingPercent": None,
-                "numberOfTrials": None,
-                "Session": None
+                "df": None
             }
+            
+class IDTFixationSaccadeClassifier:
+    def __init__(self, threshold: float = 0.03, win_len: int = 12):
+        self.threshold = threshold
+        self.win_len = win_len
+
+    @staticmethod
+    def _calc_min_max_dispersion(x_range: np.array, y_range: np.array) -> int:
+        dx = np.max(x_range) - np.min(x_range)
+        dy = np.max(y_range) - np.min(y_range)
+        return dx + dy
+
+    def fit_predict(self, x: np.array, y: np.array = None) -> Tuple[List[int], List[int], List[int], List[int]]:
+
+        if y is None:
+            tmp = x.copy()
+            x, y = tmp[:, 0], tmp[:, 1]
+
+        if x.shape[0] != y.shape[0]:
+            raise ValueError('x and y shape does not match')
+
+        fixations, saccades = [], []
+        fixation_colors, saccades_colors = [], []
+
+        win_beg, win_end = 0, min(len(x) - 1, self.win_len)
+
+        fix_c, sacc_c = 0, 0
+
+        while (win_beg < len(x)):
+            if np.isnan(x[win_beg: win_end]).any() or np.isnan(y[win_beg: win_end]).any():
+                win_beg += 1
+                win_end = min(len(x), win_beg + self.win_len)
+                continue
+
+            dispersion = self._calc_min_max_dispersion(x[win_beg: win_end], y[win_beg: win_end])
+            if dispersion < self.threshold:
+                while win_end < len(x) - 1 and dispersion < self.threshold:
+                    win_end += 1
+                    dispersion = self._calc_min_max_dispersion(x[win_beg: win_end], y[win_beg: win_end])
+                if win_end - win_beg > 10:
+                    for i in range(win_beg, win_end):
+                        fixations.append(i)
+                        fixation_colors.append(fix_c)
+                    fix_c += 1
+                win_beg, win_end = win_end + 1, min(len(x), win_end + 1 + self.win_len)
+            else:
+                if len(saccades) > 0 and win_beg - 1 != saccades[-1]:
+                    sacc_c += 1
+                saccades.append(win_beg)
+                saccades_colors.append(sacc_c)
+                win_beg += 1
+
+        return fixations, saccades, fixation_colors, saccades_colors
             
 if __name__ == "__main__":
     input_dir=r'C:\Users\Cyril\HESSENBOX\Eye-Tracking_LAVA (Jasmin Devi Nuscheler)\Data_from_different_participants'
     output_dir=r'C:\dev\grk-2700\eye_tracking_pipeline\tests\results'
     data_file_path = 'C:\\Users\\Cyril\\HESSENBOX\\Eye-Tracking_LAVA (Jasmin Devi Nuscheler)\\Data_from_different_participants\\2.Germany\\Primary_school\\A\\069_trackerTest2022_2_5_2024-06-13_08h05.39.112.hdf5'
-    tobii_hdf5_to_pandas(data_file_path)
+    eye_tracking_hdf5_to_df(data_file_path)
