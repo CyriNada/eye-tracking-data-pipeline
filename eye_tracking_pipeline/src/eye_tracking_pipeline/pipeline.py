@@ -18,17 +18,17 @@ def run_pipeline(input_dir: str,
     
     
     # TODO: Participants without marked session
-    if not no_session_table.empty:
-        session_lookup = {
-            (row['Subject'], row['Version']): row['Session']
-            for _, row in no_session_table.iterrows()
-        }
+    # if not no_session_table.empty:
+    #     session_lookup = {
+    #         (row['Subject'], row['Version']): row['Session']
+    #         for _, row in no_session_table.iterrows()
+    #     }
         
-        # Apply to meta_table where Country is Deutschland
-        for idx in meta_table[meta_table['Country'] == 'Deutschland'].index:
-            key = (meta_table.at[idx, 'Subject'], meta_table.at[idx, 'Version'])
-            if key in session_lookup:
-                meta_table.at[idx, 'Session'] = session_lookup[key]
+    #     # Apply to meta_table where Country is Deutschland
+    #     for idx in meta_table[meta_table['Country'] == 'Deutschland'].index:
+    #         key = (meta_table.at[idx, 'Subject'], meta_table.at[idx, 'Version'])
+    #         if key in session_lookup:
+    #             meta_table.at[idx, 'Session'] = session_lookup[key]
         
     # TODO: Skip processed files with existing_meta_table
     
@@ -39,7 +39,7 @@ def run_pipeline(input_dir: str,
         
         # Check if already processed
         # if os.path.exists(os.path.join(output_dir, file_meta_row['out'])):
-        #     logger.info(f"Skipping '{file_meta_row['out']}': already exists")
+        #     logger.info(f"Already exists: '{file_meta_row['out']}'")
         #     continue
         
         data_file_path = os.path.join(input_dir, file_meta_row['path'], file_meta_row['in'])

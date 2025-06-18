@@ -220,7 +220,34 @@ class IDTFixationSaccadeClassifier:
                 win_beg += 1
 
         return fixations, saccades, fixation_colors, saccades_colors
+        
+def aggregate_processed_data(output_dir: str, meta_table: pd.DataFrame) -> pd.DataFrame:
+    meta_table = meta_table[meta_table.conversionSuccess == 1].set_index('out')
+    data_tables = []
+    for data_table_file in meta_table[meta_table.conversionSuccess == 1].index: # meta_table[(meta_table.missingPercent == 0) & (meta_table.Run == 1) & (meta_table.numberOfTrials == 20) & (meta_table.Country == 'Deutschland')].index:
+        data_table = pd.read_csv(os.path.join(output_dir, f'{data_table_file}'), dtype={'fixation':'Int64', 'saccades':'Int64'})
+        
+        # Get normalized time
+        for trial in data_table.trial.unique():
+            trial_df = data_table[data_table.trial == trial] 
             
+            onset_time = data_table.loc[data_table.trial == trial, 'time'].iloc[0]
+            trial_times = data_table.loc[data_table.trial == trial, 'time']
+            data_table.loc[data_table.trial == trial, 'timeFromOnsetMs'] = trial_times - onset_time - 3
+            
+        data_table.loc[:, ['in','Subject','Country','Institution','Version','missingPercent','Run', 'numberOfTrials']] = meta_table.loc[data_table_file, ['in','Subject','Country','Institution','Version','missingPercent','Run', 'numberOfTrials']].values
+        data_table.loc[:, 'out'] = meta_table.loc[data_table_file,:].name
+        
+        # fixations_table = pd.read_csv(f"lava_converted/processed_data/{'fixations_'+data_table_file}", delimiter=';', dtype={'ROI':'Int64'})
+        # data_table.loc[:, 'file'] = data_table_file
+        # data_table = data_table.merge(
+        # fixations_table[['trial', 'fixation', 'fixRegionName']], 
+        #     on=['trial', 'fixation'],
+        #     how='left'  
+        # )
+        data_tables.append(data_table)
+    return pd.concat(data_tables, ignore_index=True)
+    
 if __name__ == "__main__":
     input_dir=r'C:\Users\Cyril\HESSENBOX\Eye-Tracking_LAVA (Jasmin Devi Nuscheler)\Data_from_different_participants'
     output_dir=r'C:\dev\grk-2700\eye_tracking_pipeline\tests\results'
