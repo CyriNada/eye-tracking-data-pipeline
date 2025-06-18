@@ -14,27 +14,40 @@ def run_pipeline(input_dir: str,
                  output_dir: str, 
                  existing_meta_table: pd.DataFrame = pd.DataFrame(),
                  no_session_table: pd.DataFrame = pd.DataFrame()):
+    """
+    Processes eye-tracking HDF5 files, converts them to CSV, and augments a metadata table
+    with conversion success, session info, and fixation/saccade analysis.
+    
+    Args:
+        input_dir (str): Path to input directory containing HDF5 files.
+        output_dir (str): Path to output directory where results will be saved.
+        existing_meta_table (pd.DataFrame): Previously processed metadata (optional).
+        no_session_table (pd.DataFrame): Table with participants with no recorded session (optional).
+    
+    Returns:
+        pd.DataFrame: Updated metadata table with processing results.
+    """
     meta_table = generate_metatable(input_dir)
     
-    
     # TODO: Participants without marked session
-    # if not no_session_table.empty:
-    #     session_lookup = {
-    #         (row['Subject'], row['Version']): row['Session']
-    #         for _, row in no_session_table.iterrows()
-    #     }
+    if not no_session_table.empty:
+        session_lookup = {
+            (row['Subject'], row['Version']): row['Session']
+            for _, row in no_session_table.iterrows()
+        }
         
-    #     # Apply to meta_table where Country is Deutschland
-    #     for idx in meta_table[meta_table['Country'] == 'Deutschland'].index:
-    #         key = (meta_table.at[idx, 'Subject'], meta_table.at[idx, 'Version'])
-    #         if key in session_lookup:
-    #             meta_table.at[idx, 'Session'] = session_lookup[key]
+        # Apply to meta_table where Country is Deutschland
+        for idx in meta_table.index:
+            key = (meta_table.at[idx, 'Subject'], meta_table.at[idx, 'Version'])
+            if key in session_lookup:
+                meta_table.at[idx, 'Session'] = session_lookup[key]
         
     # TODO: Skip processed files with existing_meta_table
     
     # Ensure output directories exist
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)  
+    # Iterate through each file entry in the metadata table
     for i, file_meta_row in meta_table.iterrows(): # meta_table[meta_table['in'] == '082_trackerTest2022_2_5_2024-06-14_08h11.24.487.hdf5']
         
         # Check if already processed
@@ -42,11 +55,13 @@ def run_pipeline(input_dir: str,
         #     logger.info(f"Already exists: '{file_meta_row['out']}'")
         #     continue
         
+        # Build full path to HDF5 input file
         data_file_path = os.path.join(input_dir, file_meta_row['path'], file_meta_row['in'])
+        # Attempt conversion of HDF5 to DataFrame
         result_dict = eye_tracking_hdf5_to_df(data_file_path)
         
         meta_table.at[i, 'conversionSuccess'] = result_dict['conversionSuccess']
-        if result_dict['conversionSuccess'] == 0:
+        if result_dict['conversionSuccess'] == 0: # If conversion failed, store error message and skip to next file
             # logger.warning(f"Conversion of '{file_meta_row['in']}' failed: with {result_dict['errorMessage']}")
             meta_table.at[i, 'conversionError'] = result_dict['errorMessage']
             continue
@@ -56,7 +71,6 @@ def run_pipeline(input_dir: str,
             meta_table.at[i, 'Session'] = result_dict['session']
         
         experiment_df = result_dict['df']
-        experiment_df.to_csv(os.path.join(output_dir, file_meta_row['out']), index=False)
 
         meta_table.at[i, 'numberOfTrials'] = experiment_df.trial.max()
         meta_table.at[i, 'missingCount'] = experiment_df.trackloss.sum()
@@ -74,6 +88,8 @@ def run_pipeline(input_dir: str,
                                        gaze_df.loc[:, 'gaze_y'].to_numpy())
             experiment_df.loc[fixations + trial_df.index[0], 'fixation'] = fixation_indices
             experiment_df.loc[saccades + trial_df.index[0], 'saccades'] = saccades_indices
+            
+        experiment_df.to_csv(os.path.join(output_dir, file_meta_row['out']), index=False)
     return meta_table
     
                 

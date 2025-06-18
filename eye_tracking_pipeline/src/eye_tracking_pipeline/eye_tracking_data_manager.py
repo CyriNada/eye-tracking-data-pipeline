@@ -125,7 +125,7 @@ def eye_tracking_hdf5_to_df(data_file_path: str) -> dict:
             
             if len(events_df.loc[events_df['text'].str.startswith('Target:', na=False)].text.str.split(': ',expand=True)[3].tolist())==20:
                 tstart_events['posPerm'] = events_df.loc[events_df['text'].str.startswith('Target:', na=False)].text.str.split(': ',expand=True)[3].tolist()
-            else:
+            else: # TODO: Save experiment with fewer trials anyway
                 raise ValueError(f'Not 20: {data_file_path}')
             tstart_events=tstart_events.rename(columns={'time': 'start_time'})
             
@@ -235,7 +235,7 @@ def aggregate_processed_data(output_dir: str, meta_table: pd.DataFrame) -> pd.Da
             trial_times = data_table.loc[data_table.trial == trial, 'time']
             data_table.loc[data_table.trial == trial, 'timeFromOnsetMs'] = trial_times - onset_time - 3
             
-        data_table.loc[:, ['in','Subject','Country','Institution','Version','missingPercent','Run', 'numberOfTrials']] = meta_table.loc[data_table_file, ['in','Subject','Country','Institution','Version','missingPercent','Run', 'numberOfTrials']].values
+        data_table.loc[:, ['in','Subject','Country','Institution','Version', 'Session','missingPercent','Run', 'numberOfTrials']] = meta_table.loc[data_table_file, ['in','Subject','Country','Institution','Version', 'Session','missingPercent','Run', 'numberOfTrials']].values
         data_table.loc[:, 'out'] = meta_table.loc[data_table_file,:].name
         
         # fixations_table = pd.read_csv(f"lava_converted/processed_data/{'fixations_'+data_table_file}", delimiter=';', dtype={'ROI':'Int64'})
