@@ -1,6 +1,4 @@
 import os
-from pathlib import Path
-from typing import Tuple, List
 
 import logging
 logging.basicConfig(level=logging.INFO)
@@ -14,9 +12,25 @@ from .eye_tracking_data_manager import eye_tracking_hdf5_to_df, IDTFixationSacca
 
 def run_pipeline(input_dir: str, 
                  output_dir: str, 
-                 existing_meta_table: pd.DataFrame = pd.DataFrame()):
+                 existing_meta_table: pd.DataFrame = pd.DataFrame(),
+                 no_session_table: pd.DataFrame = pd.DataFrame()):
     meta_table = generate_metatable(input_dir)
     
+    
+    # TODO: Participants without marked session
+    if not no_session_table.empty:
+        session_lookup = {
+            (row['Subject'], row['Version']): row['Session']
+            for _, row in no_session_table.iterrows()
+        }
+        
+        # Apply to meta_table where Country is Deutschland
+        for idx in meta_table[meta_table['Country'] == 'Deutschland'].index:
+            key = (meta_table.at[idx, 'Subject'], meta_table.at[idx, 'Version'])
+            if key in session_lookup:
+                meta_table.at[idx, 'Session'] = session_lookup[key]
+        
+    # TODO: Skip processed files with existing_meta_table
     
     # Ensure output directories exist
     if not os.path.exists(output_dir):
@@ -37,7 +51,9 @@ def run_pipeline(input_dir: str,
             meta_table.at[i, 'conversionError'] = result_dict['errorMessage']
             continue
         
-        meta_table.at[i, 'Session'] = result_dict['session']
+        # Don't overwrite if already got from no_session_table      
+        if meta_table.at[i, 'Session'] is None:
+            meta_table.at[i, 'Session'] = result_dict['session']
         
         experiment_df = result_dict['df']
         experiment_df.to_csv(os.path.join(output_dir, file_meta_row['out']), index=False)

@@ -62,13 +62,13 @@ def eye_tracking_hdf5_to_df(data_file_path: str) -> dict:
             trial_meta_df = trial_meta_df.dropna()
 
             if trial_meta_df.empty:
-                raise ValueError(f"Meta file is empty: {file_name}")
+                raise ValueError(f"Meta file is empty")
             
             # Handle MessageEvent
             events_data = hdf['/data_collection/events/experiment/MessageEvent']
             events_df=pd.DataFrame(np.array(events_data))
             if events_df.empty:
-                raise ValueError(f"MessageEvent is empty: {file_name}")
+                raise ValueError(f"MessageEvent is empty")
 
             events_df.text=events_df.text.str.decode('utf-8')
             
@@ -93,7 +93,7 @@ def eye_tracking_hdf5_to_df(data_file_path: str) -> dict:
             eye_tracking_df=eye_tracking_df.loc[eye_tracking_df['time'].between(start_time,end_time)]
 
             if eye_tracking_df.empty:
-                raise ValueError(f"BinocularEyeSampleEvent is empty: {file_name}")
+                raise ValueError(f"BinocularEyeSampleEvent is empty")
             
             
             # eye_tracking_df=eye_tracking_df.loc[eye_tracking_df.status==0] # Drops trackless data 
