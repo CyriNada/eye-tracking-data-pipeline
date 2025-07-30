@@ -237,14 +237,7 @@ def aggregate_processed_data(output_dir: str, meta_table: pd.DataFrame) -> pd.Da
             
         data_table.loc[:, ['in','Subject','Country','Institution','Version', 'Session','missingPercent','Run', 'numberOfTrials']] = meta_table.loc[data_table_file, ['in','Subject','Country','Institution','Version', 'Session','missingPercent','Run', 'numberOfTrials']].values
         data_table.loc[:, 'out'] = meta_table.loc[data_table_file,:].name
-        
-        # fixations_table = pd.read_csv(f"lava_converted/processed_data/{'fixations_'+data_table_file}", delimiter=';', dtype={'ROI':'Int64'})
-        # data_table.loc[:, 'file'] = data_table_file
-        # data_table = data_table.merge(
-        # fixations_table[['trial', 'fixation', 'fixRegionName']], 
-        #     on=['trial', 'fixation'],
-        #     how='left'  
-        # )
+
         data_tables.append(data_table)
     return pd.concat(data_tables, ignore_index=True)
     

@@ -36,7 +36,6 @@ def run_pipeline(input_dir: str,
             for _, row in no_session_table.iterrows()
         }
         
-        # Apply to meta_table where Country is Deutschland
         for idx in meta_table.index:
             key = (meta_table.at[idx, 'Subject'], meta_table.at[idx, 'Version'])
             if key in session_lookup:
