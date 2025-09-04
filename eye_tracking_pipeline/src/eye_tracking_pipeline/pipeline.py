@@ -29,18 +29,29 @@ def run_pipeline(input_dir: str,
     """
     meta_table = generate_metatable(input_dir)
     
-    # TODO: Participants without marked session
-    if not no_session_table.empty:
-        session_lookup = {
-            (row['Subject'], row['Version']): row['Session']
-            for _, row in no_session_table.iterrows()
-        }
-        
-        for idx in meta_table.index:
-            key = (meta_table.at[idx, 'Subject'], meta_table.at[idx, 'Version'])
-            if key in session_lookup:
-                meta_table.at[idx, 'Session'] = session_lookup[key]
-        
+    # Participants without marked session
+    session_lookup = {
+        (row['Subject'], row['Version']): row['Session']
+        for _, row in no_session_table.iterrows()
+    }
+    for idx in meta_table.index:
+        # Skip Control group (has no sessions)
+        if((meta_table.at[idx, 'Country'] == 'Control Group')):
+            continue
+        same_trial = meta_table[(meta_table.Subject == meta_table.at[idx, 'Subject']) &
+                                (meta_table.Country == meta_table.at[idx, 'Country']) & 
+                                (meta_table.Institution == meta_table.at[idx, 'Institution']) & 
+                                (meta_table.Run == 1)]
+        # Skip subjects with two sessions -> must be marked
+        if(same_trial.shape[0] > 1):
+            meta_table.loc[same_trial.index, 'ifSubjectHasPairAB'] = True
+            continue
+        else:
+            meta_table.loc[same_trial.index, 'ifSubjectHasPairAB'] = False
+        key = (meta_table.at[idx, 'Subject'], meta_table.at[idx, 'Version'])
+        if key in session_lookup:
+            meta_table.at[idx, 'Session'] = session_lookup[key]
+     
     # TODO: Skip processed files with existing_meta_table
     
     # Ensure output directories exist
@@ -65,8 +76,10 @@ def run_pipeline(input_dir: str,
             meta_table.at[i, 'conversionError'] = result_dict['errorMessage']
             continue
         
-        # Don't overwrite if already got from no_session_table      
-        if meta_table.at[i, 'Session'] is None:
+        # Don't overwrite if already got from no_session_table or subject has no A/B pair, unless marked as session 2
+        if (result_dict['session'] == 2):
+            meta_table.at[i, 'Session'] = 2
+        elif (meta_table.at[i, 'Session'] is None) and (meta_table.at[i, 'ifSubjectHasPairAB'] == True):
             meta_table.at[i, 'Session'] = result_dict['session']
         
         experiment_df = result_dict['df']

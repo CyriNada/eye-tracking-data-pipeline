@@ -96,14 +96,15 @@ def generate_metatable(input_dir: str) -> pd.DataFrame:
             "Date": date,
             "Time": time,
             "in": hdf5_file_name,
-            "missingCount": None,   # Updated later
-            "missingPercent": None, # Updated later
-            "numberOfTrials": None, # Updated later
-            "Session": None,        # Updated later     
+            "missingCount": None,       # Updated later
+            "missingPercent": None,     # Updated later
+            "numberOfTrials": None,     # Updated later
+            "Session": None,            # Updated later     
             "institutionCode": institution_code,
             "path": relative_path,
             "ifControlGroup": if_control_group,
-            'conversionError': None # Updated later 
+            "ifSubjectHasPairAB": None,  # Updated later
+            "conversionError": None     # Updated later 
         })
         
     # Handle subjects with multiple attempts
